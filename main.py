@@ -12,13 +12,23 @@ from pydantic import Field
 from typing import Optional, List, Any
 from src.api import router 
 from src.deepseek_llm import DeepSeekLLM
+from fastapi.middleware.cors import CORSMiddleware
 
-# Your DeepSeekLLM class definition here (copy your class code exactly)
-
-# ✅ Define FastAPI app at the top
 app = FastAPI()
- # Make sure this file exists!
 
+# 👇 Allow frontend on localhost:3000
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,            # 🌐 allow React frontend
+    allow_credentials=True,
+    allow_methods=["*"],              # 🟢 Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],              # 🟢 Allow all headers
+)
 
 app.include_router(router)
 
@@ -29,47 +39,31 @@ logger = logging.getLogger(__name__)
 from bs4 import BeautifulSoup
 import requests
 
+# dieerect end apis for testing
+# remove when project comes to the end
+@app.get("/fetch_bookings")
+def fetch_bookings(room_name: str, db: Session = Depends(get_db)):
+    print(f"🔵 Received Input -> room_name: {room_name}")
 
+    room = db.query(MRBSRoom).filter(MRBSRoom.room_name == room_name).first()
+    if not room:
+        print(f"🔴 Room '{room_name}' not found")
+        raise HTTPException(status_code=404, detail="Room not found")
 
-# @app.get("/scrape_mrbs/")
-# def scrape_mrbs(
-#     year: int = Query(..., example=2025),
-#     month: int = Query(..., example=4),
-#     day: int = Query(..., example=30),
-#     area: int = Query(..., example=2),
-#     room: int = Query(..., example=26)
-# ):
-#     """
-#     Scrapes MRBS booking records from the day.php page and returns them as JSON.
-#     """
+    print(f"✅ Room Found -> room_id: {room.id}")
 
-#     # 1. Build the URL dynamically
-#     url = f"http://localhost/foemrbs/day.php?year={year}&month={month:02d}&day={day:02d}&area={area}&room={room}"
+    existing_bookings = (
+        db.query(MRBSEntry)
+        .filter(MRBSEntry.room_id == room.id)
+        .all()
+    )
 
-#     try:
-#         # 2. Send HTTP GET request
-#         response = requests.get(url)
-
-#         if response.status_code != 200:
-#             raise HTTPException(status_code=502, detail=f"Failed to fetch MRBS page. HTTP {response.status_code}")
-
-#         # 3. Parse HTML using BeautifulSoup
-#         soup = BeautifulSoup(response.text, 'html.parser')
-
-#         # ⚠️ 4. Find booking elements — UPDATE this selector based on your MRBS HTML structure
-#         bookings = soup.find_all("div", class_="booking")  # Adjust if needed
-
-#         result = []
-
-#         for booking in bookings:
-#             # 5. Extract booking info — adapt this based on your HTML layout
-#             data = booking.text.strip().replace("\n", " ").replace("\r", "")
-#             result.append({"text": data})
-
-#         return {"date": f"{year}-{month:02d}-{day:02d}", "room": room, "bookings": result}
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error scraping MRBS: {str(e)}")
+    if existing_bookings:
+        print(f"✅ Room '{room_name}' has bookings")
+        return existing_bookings
+    
+    print(f"ℹ️ Room '{room_name}' isn't booked at this time")
+    return {"message": f"{room_name} isn't booked at this time"}
 
 @app.get("/check_availability/")
 def check_availability(room_name: str, date: date, start_time: str, end_time: str, db: Session = Depends(get_db)):
@@ -120,19 +114,3 @@ def check_availability(room_name: str, date: date, start_time: str, end_time: st
     print(f"✅ Room '{room_name}' is available for booking")
     return {"message": f"{room_name} is available. You can book it."}
 
-# @app.get("/test/")
-# def test_api():
-#     return {"message": "FastAPI is working!"}
-
-# @app.on_event("startup")
-# async def check_deepseek_llm():
-#     print("Checking DeepSeek LLM configuration...")
-
-#     try:
-#         llm = DeepSeekLLM()
-#         # Run a simple prompt to verify
-#         response = llm._call("Hello")
-#         print("✅ DeepSeek LLM is configured correctly. Sample response:")
-#         print(response)
-#     except Exception as e:
-#         print(f"❌ DeepSeek LLM configuration failed: {e}")

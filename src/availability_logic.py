@@ -37,11 +37,11 @@ def check_availability(room_name: str, date: str, start_time: str, end_time: str
     if conflicting:
         message = f"{room_name} is NOT available at that time."
         print(message)
-        return {"available": False, "message": message}
+        return {"status": "unavailable", "message": message}
 
     message = f"{room_name} is available from {start_time} to {end_time} on {date}."
     print(message)
-    return {"available": True, "message": message}
+    return {"status": "available", "message": message}
 
 def add_booking(room_name: str, date: str, start_time: str, end_time: str, created_by: str, db: Session):
     # Step 1: Check if room exists
